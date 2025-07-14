@@ -20,13 +20,22 @@ function streamToBuffer(stream) {
 }
 
 exports.handler = async function(event, context) {
+    // Hata ayıklama için gelen tüm isteği logla
+    console.log("GELEN EVENT:", JSON.stringify(event, null, 2));
+
     const response = new twilio.twiml.VoiceResponse();
+    
+    // --- BU KESİNLİKLE DOĞRU ÇÖZÜM ---
     const queryParams = event.queryStringParameters;
-    const callSid = queryParams.CallSid;
+    const bodyParams = event.body ? new URLSearchParams(event.body) : new URLSearchParams();
+    // CallSid'yi hem URL'de hem de gövdede ara. Hangisinde varsa onu al.
+    const callSid = queryParams.CallSid || bodyParams.get('CallSid');
+    // --- ÇÖZÜMÜN SONU ---
+    
     const baseUrl = process.env.BASE_URL;
 
     if (!baseUrl || !callSid) {
-        console.error("Kritik Hata: BASE_URL veya CallSid eksik!");
+        console.error(`Kritik Hata: BASE_URL (${baseUrl}) veya CallSid (${callSid}) eksik!`);
         response.say({ language: 'tr-TR' }, "Kritik bir yapılandırma hatası oluştu. Lütfen yönetici ile iletişime geçin.");
         response.hangup();
         return { statusCode: 200, headers: { 'Content-Type': 'text/xml' }, body: response.toString() };
@@ -37,15 +46,14 @@ exports.handler = async function(event, context) {
             siteID: process.env.NETLIFY_SITE_ID,
             token: process.env.NETLIFY_AUTH_TOKEN
         };
-        // DİKKAT: Store adı 'public-' ile başlamalı ki herkese açık olsun.
         const audioStore = getStore({ name: 'public-audio-arsafon', ...storeConfig });
         const transcriptStore = getStore({ name: 'transcripts', ...storeConfig });
 
-        const firstInteraction = queryParams.first !== 'false';
+        const firstInteraction = queryParams.first === 'true';
         const encodedPrompt = queryParams.prompt;
         const systemPrompt = Buffer.from(encodedPrompt, 'base64').toString('utf8');
         let conversationHistory = queryParams.convo ? decodeURIComponent(queryParams.convo) : "";
-        const userInput = event.body ? new URLSearchParams(event.body).get('SpeechResult') : null;
+        const userInput = bodyParams.get('SpeechResult');
 
         let assistantResponseText;
 
@@ -84,11 +92,10 @@ exports.handler = async function(event, context) {
         const audioKey = `${callSid}-response.mp3`;
         await audioStore.set(audioKey, audioBuffer);
         
-        // --- BU KESİNLİKLE DOĞRU YÖNTEM ---
         const publicAudioUrl = `${baseUrl}/.netlify/blobs/public-audio-arsafon/${audioKey}`;
         response.play({}, publicAudioUrl);
-        // --- ---
-
+        
+        // `first` parametresini false olarak güncelleyerek bir sonraki adıma geç
         const nextActionUrl = `/.netlify/functions/handle-call?prompt=${encodedPrompt}&first=false&convo=${encodeURIComponent(conversationHistory)}&CallSid=${callSid}`;
 
         response.gather({
@@ -103,7 +110,7 @@ exports.handler = async function(event, context) {
         response.hangup();
 
     } catch (error) {
-        console.error('Hata:', error);
+        console.error(`Hata (CallSid: ${callSid}):`, error);
         response.say({ language: 'tr-TR' }, "Üzgünüm, bir sistem hatası oluştu. Lütfen daha sonra tekrar deneyin.");
         response.hangup();
     }
