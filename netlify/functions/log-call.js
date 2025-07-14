@@ -11,8 +11,16 @@ exports.handler = async function(event, context) {
     const callDuration = callData.get('CallDuration');
     const to = callData.get('To');
 
-    const transcriptStore = getStore('transcripts');
-    const logStore = getStore('call-logs');
+    const transcriptStore = getStore({
+    name: 'transcripts',
+    siteID: process.env.NETLIFY_SITE_ID,
+    token: process.env.NETLIFY_AUTH_TOKEN
+});
+const logStore = getStore({
+    name: 'call-logs',
+    siteID: process.env.NETLIFY_SITE_ID,
+    token: process.env.NETLIFY_AUTH_TOKEN
+});
 
     try {
         // 1. Geçici konuşma kaydını al
