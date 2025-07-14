@@ -10,20 +10,15 @@ exports.handler = async function(event, context) {
     const callDuration = callData.get('CallDuration');
     const to = callData.get('To');
 
-    const storeConfig = {
-        siteID: process.env.NETLIFY_SITE_ID,
-        token: process.env.NETLIFY_AUTH_TOKEN
-    };
-    const transcriptStore = getStore({ name: 'transcripts', ...storeConfig });
-    const logStore = getStore({ name: 'call-logs', ...storeConfig });
-    const audioStore = getStore({ name: 'audio-files-arsafon', ...storeConfig });
+    const transcriptStore = getStore('transcripts');
+    const logStore = getStore('call-logs');
+    const audioStore = getStore('audio-files-arsafon');
 
     try {
         const { blobs } = await audioStore.list({ prefix: callSid });
         for (const blob of blobs) {
             await audioStore.delete(blob.key);
         }
-
         const transcript = await transcriptStore.get(callSid);
         let summary = "Konuşma metni alınamadı veya konuşma gerçekleşmedi.";
         let sentiment = "N/A";
@@ -49,6 +44,5 @@ exports.handler = async function(event, context) {
         console.error(`Loglama hatası (CallSid: ${callSid}):`, error);
         await logStore.setJSON(callSid, { error: 'Özetleme sırasında hata oluştu.', callSid: callSid, status: callStatus, duration: callDuration });
     }
-
     return { statusCode: 200, body: 'OK' };
 };
