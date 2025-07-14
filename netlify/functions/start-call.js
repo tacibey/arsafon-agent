@@ -14,7 +14,7 @@ exports.handler = async function(event, context) {
     if (!to || !prompt || !accountSid || !authToken || !twilioPhoneNumber || !baseUrl) {
         return { 
             statusCode: 500, 
-            body: JSON.stringify({ error: "Gerekli ortam değişkenleri veya parametreler eksik." }) 
+            body: JSON.stringify({ error: "Ortam değişkenleri eksik. Lütfen Netlify ayarlarını kontrol edin." }) 
         };
     }
 
@@ -22,8 +22,14 @@ exports.handler = async function(event, context) {
 
     try {
         const encodedPrompt = Buffer.from(prompt).toString('base64');
+        
+        // --- EN KRİTİK DÜZELTME ---
+        // Twilio'ya, handle-call fonksiyonuna giderken CallSid'yi URL'e
+        // eklemesini açıkça söylüyoruz. {{CallSid}} Twilio'nun kendi değişkenidir.
+        const urlWithParams = `${baseUrl}/.netlify/functions/handle-call?prompt=${encodedPrompt}&first=true&CallSid={{CallSid}}`;
+
         const call = await client.calls.create({
-            url: `${baseUrl}/.netlify/functions/handle-call?prompt=${encodedPrompt}&first=true`,
+            url: urlWithParams, // Güncellenmiş URL'i kullan
             to: to,
             from: twilioPhoneNumber,
             statusCallback: `${baseUrl}/.netlify/functions/log-call`,
