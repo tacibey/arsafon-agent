@@ -16,26 +16,29 @@ exports.handler = async function(event, context) {
         console.error("log-call çağrıldı ancak CallSid eksik.", event.body);
         return { statusCode: 400, body: 'CallSid eksik.' };
     }
+    
+    // --- KRİTİK DÜZELTME: BLOBS BAĞLANTI BİLGİLERİ ---
+    const blobConfig = {
+        siteID: process.env.SITE_ID,
+        token: process.env.NETLIFY_API_TOKEN
+    };
 
-    const transcriptStore = getStore('transcripts');
-    const logStore = getStore('call-logs');
-    const audioStore = getStore('audio-files-arsafon');
+    const transcriptStore = getStore({ name: 'transcripts', ...blobConfig });
+    const logStore = getStore({ name: 'call-logs', ...blobConfig });
+    const audioStore = getStore({ name: 'audio-files-arsafon', ...blobConfig });
 
     try {
-        // 1. Geçici ses dosyalarını temizle
         const { blobs } = await audioStore.list({ prefix: callSid });
         for (const blob of blobs) {
             await audioStore.delete(blob.key);
         }
 
-        // 2. Konuşma metnini al
         const transcript = await transcriptStore.get(callSid, { type: 'text' });
         let summary = "Konuşma metni alınamadı veya konuşma gerçekleşmedi.";
         let sentiment = "N/A";
 
         if (transcript) {
             try {
-                // 3. Konuşmayı özetle ve analiz et (Groq)
                 const prompt = `Aşağıdaki telefon görüşmesi metnini analiz et. Metin: "${transcript}"\n\nGörevin:\n1. Görüşmeyi en fazla iki cümleyle özetle.\n2. Görüşmenin genel havasını (müşterinin ilgisini) "Pozitif", "Negatif" veya "Nötr" olarak değerlendir.\n\nCevabını SADECE şu JSON formatında ver, başka hiçbir metin ekleme:\n{\n  "summary": "...",\n  "sentiment": "..."\n}`;
                 const chatCompletion = await groq.chat.completions.create({
                     messages: [{ role: 'user', content: prompt }],
@@ -52,11 +55,9 @@ exports.handler = async function(event, context) {
                 summary = "AI tarafından özetlenirken bir hata oluştu. Lütfen tam metni kontrol edin.";
                 sentiment = "Hata";
             }
-            // 4. Geçici konuşma metnini sil
             await transcriptStore.delete(callSid);
         }
         
-        // 5. Nihai logu kaydet
         const finalLog = { 
             date: new Date().toISOString(), 
             calledNumber: to, 
@@ -64,14 +65,13 @@ exports.handler = async function(event, context) {
             durationSeconds: callDuration, 
             sentiment: sentiment, 
             summary: summary,
-            transcript: transcript || "N/A", // Tam metni de loga ekleyelim
+            transcript: transcript || "N/A",
             callSid: callSid 
         };
         await logStore.setJSON(callSid, finalLog);
 
     } catch (error) {
         console.error(`Loglama hatası (CallSid: ${callSid}):`, error);
-        // Hata durumunda bile temel bilgileri kaydet
         await logStore.setJSON(callSid, { 
             error: 'Loglama sırasında genel bir hata oluştu.', 
             callSid: callSid, 
