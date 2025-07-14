@@ -2,6 +2,8 @@
   functions = "netlify/functions"
   publish = "public"
 
+# Bu, tüm fonksiyonlar için geçerli olan doğru sözdizimidir
 [functions]
   node_bundler = "esbuild"
-  timeout = 26
+  [functions."*"]
+    timeout = 26
