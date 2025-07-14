@@ -20,14 +20,19 @@ function streamToBuffer(stream) {
 exports.handler = async function(event, context) {
     const response = new twilio.twiml.VoiceResponse();
     const queryParams = event.queryStringParameters;
-    const callSid = queryParams.CallSid; // Her aramanın benzersiz kimliği
+    const callSid = queryParams.CallSid;
 
     try {
-        // Depolama alanlarını tanımla
-        const audioStore = getStore('audio-files');
-        const transcriptStore = getStore('transcripts');
-        
-        // Konuşma geçmişi ve prompt'u yönet
+        // --- BLOBS DÜZELTMESİ ---
+        // Depolama alanlarını, manuel siteID ve token ile tanımla
+        const storeConfig = {
+            siteID: process.env.NETLIFY_SITE_ID,
+            token: process.env.NETLIFY_AUTH_TOKEN
+        };
+        const audioStore = getStore({ name: 'audio-files', ...storeConfig });
+        const transcriptStore = getStore({ name: 'transcripts', ...storeConfig });
+        // --- DÜZELTME SONU ---
+
         const firstInteraction = queryParams.first !== 'false';
         const encodedPrompt = queryParams.prompt;
         const systemPrompt = Buffer.from(encodedPrompt, 'base64').toString('utf8');
@@ -54,7 +59,7 @@ exports.handler = async function(event, context) {
             ];
             const chatCompletion = await groq.chat.completions.create({
                 messages: messages,
-                model: 'llama3-8b-8192', // Hızlı bir modelle devam edelim
+                model: 'llama3-8b-8192',
             });
             assistantResponseText = chatCompletion.choices[0]?.message?.content || "Üzgünüm, bir sorun oluştu.";
         }
@@ -64,8 +69,6 @@ exports.handler = async function(event, context) {
             await transcriptStore.set(callSid, conversationHistory);
         }
 
-        // --- YENİ VE DOĞRU YÖNTEM ---
-        // 1. ElevenLabs'ten sesi al
         const audioStream = await elevenlabs.textToSpeechStream({
             textInput: assistantResponseText,
             voiceId: voiceId,
@@ -73,19 +76,12 @@ exports.handler = async function(event, context) {
             output_format: 'mp3_44100_128'
         });
         const audioBuffer = await streamToBuffer(audioStream);
-
-        // 2. Sesi, her arama için benzersiz bir isimle Netlify Blobs'a kaydet
         const audioKey = `${callSid}-response.mp3`;
         await audioStore.set(audioKey, audioBuffer, {
             metadata: { contentType: 'audio/mpeg' }
         });
-
-        // 3. Kaydedilen sesin herkese açık URL'ini al
         const audioUrl = await audioStore.getSignedURL(audioKey);
-        
-        // 4. Twilio'ya Base64 yerine sadece sesin URL'ini ver
         response.play({}, audioUrl);
-        // --- YÖNTEMİN SONU ---
 
         const nextActionUrl = `/.netlify/functions/handle-call?prompt=${encodedPrompt}&first=false&convo=${encodeURIComponent(conversationHistory)}&CallSid=${callSid}`;
 
