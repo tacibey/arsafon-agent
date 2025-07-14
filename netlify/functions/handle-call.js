@@ -7,7 +7,7 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const elevenlabs = new ElevenLabs({ apiKey: process.env.ELEVENLABS_API_KEY });
 
 // ElevenLabs ses ID'si. Değiştirmek istersen ElevenLabs sitesinden bakabilirsin.
-const voiceId = 'pNInz6obpgU5sV7FJG3t'; 
+const voiceId = 'xyqF3vGMQlPk3e7yA4DI'; 
 
 exports.handler = async function(event, context) {
 const response = new twilio.twiml.VoiceResponse();
