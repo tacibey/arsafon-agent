@@ -8,20 +8,13 @@ exports.handler = async function(event, context) {
     }
 
     try {
-        const storeConfig = {
-            siteID: process.env.NETLIFY_SITE_ID,
-            token: process.env.NETLIFY_AUTH_TOKEN
-        };
-        // DİKKAT: Artık store adları gizli, public değil.
-        const audioStore = getStore({ name: 'audio-files-arsafon', ...storeConfig });
-
+        const audioStore = getStore('audio-files-arsafon');
         const audioBuffer = await audioStore.get(key, { type: 'buffer' });
 
         if (!audioBuffer) {
             return { statusCode: 404, body: 'Ses dosyası bulunamadı.' };
         }
 
-        // Twilio'ya dosyayı Base64 formatında, doğru başlıkla gönderiyoruz.
         return {
             statusCode: 200,
             headers: { 'Content-Type': 'audio/mpeg' },
@@ -29,7 +22,7 @@ exports.handler = async function(event, context) {
             isBase64Encoded: true,
         };
     } catch (error) {
-        console.error('Ses sunucu hatası:', error);
+        console.error(`Ses sunucu hatası (key: ${key}):`, error);
         return { statusCode: 500, body: 'Ses dosyası sunulurken hata oluştu.' };
     }
 };
