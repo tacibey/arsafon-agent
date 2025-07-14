@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arsafon AI Call Agent</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="auth-container">
+        <h2>Giriş</h2>
+        <input type="password" id="password" placeholder="Şifre">
+        <button id="login-btn">Giriş Yap</button>
+    </div>
+
+    <div id="main-container" style="display:none;">
+        <h1>Arsafon AI Call Agent</h1>
+        
+        <div class="card">
+            <h2>1. Aranacak Telefon Numaraları</h2>
+            <p>Her numarayı yeni bir satıra, ülke koduyla birlikte yazın (örn: +905321234567).</p>
+            <textarea id="phone-numbers" rows="10" placeholder="+905321234567\n+905321234568"></textarea>
+        </div>
+
+        <div class="card">
+            <h2>2. AI Sistem Prompt'u</h2>
+            <p>AI'ın nasıl davranacağını, amacını ve kişiliğini burada tanımlayın.</p>
+            <textarea id="system-prompt" rows="15">Sen Arsafon adlı bir gayrimenkul şirketinde çalışan bir asistansın. Görevin, aradığın kişilere yeni arsa projelerimiz hakkında kısaca bilgi vermek ve ilgilenip ilgilenmediklerini anlamaktır. Eğer ilgileniyorlarsa, satış temsilcimizin kendilerini araması için uygun bir zaman olup olmadığını sor. Kesinlikle agresif olma, kibar ve profesyonel ol. Konuşmayı kısa tutmaya çalış. "Merhaba, ben yapay zeka asistanı Volkan, Arsafon'dan arıyorum, müsait miydiniz?" diyerek başla.</textarea>
+        </div>
+
+        <button id="start-calls-btn">ARAMALARI BAŞLAT</button>
+        
+        <div id="status-log" class="log-section">
+            <h2>İşlem Durumu</h2>
+            <pre id="log-output"></pre>
+        </div>
+
+        <div id="call-records" class="log-section">
+            <h2>Geçmiş Arama Kayıtları</h2>
+            <button id="fetch-records-btn">Kayıtları Getir</button>
+            <pre id="records-output">Geçmiş kayıtları görmek için butona tıklayın.</pre>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
