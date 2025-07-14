@@ -1,3 +1,5 @@
+// netlify/functions/log-call.js
+
 const { getStore } = require('@netlify/blobs');
 const Groq = require('groq-sdk');
 
@@ -10,39 +12,74 @@ exports.handler = async function(event, context) {
     const callDuration = callData.get('CallDuration');
     const to = callData.get('To');
 
+    if (!callSid) {
+        console.error("log-call çağrıldı ancak CallSid eksik.", event.body);
+        return { statusCode: 400, body: 'CallSid eksik.' };
+    }
+
     const transcriptStore = getStore('transcripts');
     const logStore = getStore('call-logs');
     const audioStore = getStore('audio-files-arsafon');
 
     try {
+        // 1. Geçici ses dosyalarını temizle
         const { blobs } = await audioStore.list({ prefix: callSid });
         for (const blob of blobs) {
             await audioStore.delete(blob.key);
         }
-        const transcript = await transcriptStore.get(callSid);
+
+        // 2. Konuşma metnini al
+        const transcript = await transcriptStore.get(callSid, { type: 'text' });
         let summary = "Konuşma metni alınamadı veya konuşma gerçekleşmedi.";
         let sentiment = "N/A";
 
         if (transcript) {
-            const prompt = `Aşağıdaki telefon görüşmesi metnini analiz et. Metin: "${transcript}"\n\nGörevin:\n1. Görüşmeyi en fazla iki cümleyle özetle.\n2. Görüşmenin genel havasını (müşterinin ilgisini) "Pozitif", "Negatif" veya "Nötr" olarak değerlendir.\n\nCevabını şu JSON formatında ver:\n{\n  "summary": "...",\n  "sentiment": "..."\n}`;
-            const chatCompletion = await groq.chat.completions.create({
-                messages: [{ role: 'user', content: prompt }],
-                model: 'llama3-8b-8192',
-                temperature: 0.1,
-                response_format: { type: "json_object" },
-            });
-            const result = JSON.parse(chatCompletion.choices[0].message.content);
-            summary = result.summary;
-            sentiment = result.sentiment;
+            try {
+                // 3. Konuşmayı özetle ve analiz et (Groq)
+                const prompt = `Aşağıdaki telefon görüşmesi metnini analiz et. Metin: "${transcript}"\n\nGörevin:\n1. Görüşmeyi en fazla iki cümleyle özetle.\n2. Görüşmenin genel havasını (müşterinin ilgisini) "Pozitif", "Negatif" veya "Nötr" olarak değerlendir.\n\nCevabını SADECE şu JSON formatında ver, başka hiçbir metin ekleme:\n{\n  "summary": "...",\n  "sentiment": "..."\n}`;
+                const chatCompletion = await groq.chat.completions.create({
+                    messages: [{ role: 'user', content: prompt }],
+                    model: 'llama3-8b-8192',
+                    temperature: 0.1,
+                    response_format: { type: "json_object" },
+                });
+                const resultText = chatCompletion.choices[0].message.content;
+                const result = JSON.parse(resultText);
+                summary = result.summary || "Özet alınamadı.";
+                sentiment = result.sentiment || "Değerlendirilemedi.";
+            } catch (e) {
+                console.error(`Groq özetleme hatası (CallSid: ${callSid}):`, e);
+                summary = "AI tarafından özetlenirken bir hata oluştu. Lütfen tam metni kontrol edin.";
+                sentiment = "Hata";
+            }
+            // 4. Geçici konuşma metnini sil
             await transcriptStore.delete(callSid);
         }
         
-        const finalLog = { date: new Date().toISOString(), calledNumber: to, status: callStatus, durationSeconds: callDuration, sentiment: sentiment, summary: summary, callSid: callSid };
+        // 5. Nihai logu kaydet
+        const finalLog = { 
+            date: new Date().toISOString(), 
+            calledNumber: to, 
+            status: callStatus, 
+            durationSeconds: callDuration, 
+            sentiment: sentiment, 
+            summary: summary,
+            transcript: transcript || "N/A", // Tam metni de loga ekleyelim
+            callSid: callSid 
+        };
         await logStore.setJSON(callSid, finalLog);
 
     } catch (error) {
         console.error(`Loglama hatası (CallSid: ${callSid}):`, error);
-        await logStore.setJSON(callSid, { error: 'Özetleme sırasında hata oluştu.', callSid: callSid, status: callStatus, duration: callDuration });
+        // Hata durumunda bile temel bilgileri kaydet
+        await logStore.setJSON(callSid, { 
+            error: 'Loglama sırasında genel bir hata oluştu.', 
+            callSid: callSid, 
+            status: callStatus, 
+            duration: callDuration,
+            date: new Date().toISOString()
+        });
     }
+    
     return { statusCode: 200, body: 'OK' };
 };
