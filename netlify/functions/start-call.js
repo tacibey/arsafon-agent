@@ -1,3 +1,5 @@
+// netlify/functions/start-call.js
+
 const twilio = require('twilio');
 
 exports.handler = async function(event, context) {
@@ -21,17 +23,18 @@ exports.handler = async function(event, context) {
     const client = twilio(accountSid, authToken);
 
     try {
+        // Prompt'u güvenli bir şekilde URL'de taşımak için Base64'e çeviriyoruz.
         const encodedPrompt = Buffer.from(prompt).toString('base64');
         
-        // --- NİHAİ DÜZELTME ---
-        // Artık URL'e manuel hiçbir şey eklemiyoruz. Twilio,
-        // CallSid'yi kendisi otomatik olarak ekleyecektir.
-        const initialUrl = `${baseUrl}/.netlify/functions/handle-call?prompt=${encodedPrompt}&first=true`;
+        // Arama başladığında Twilio'nun hangi URL'i sorgulayacağını belirtiyoruz.
+        // Artık 'first=true' veya 'convo' gibi parametrelere gerek yok.
+        const initialUrl = `${baseUrl}/.netlify/functions/handle-call?prompt=${encodedPrompt}`;
 
         const call = await client.calls.create({
-            url: initialUrl, // Sadece bu basit URL'i kullan
+            url: initialUrl,
             to: to,
             from: twilioPhoneNumber,
+            // Arama bittiğinde log-call fonksiyonunu tetikle
             statusCallback: `${baseUrl}/.netlify/functions/log-call`,
             statusCallbackMethod: 'POST',
             statusCallbackEvent: ['completed'],
