@@ -4,3 +4,7 @@
 
 [functions]
   node_bundler = "esbuild"
+  
+  # Belirli bir fonksiyonun zaman aşımı süresini artır
+  [functions."handle-call"]
+    timeout = 25 # Saniye cinsinden
