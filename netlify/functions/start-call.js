@@ -23,13 +23,13 @@ exports.handler = async function(event, context) {
     try {
         const encodedPrompt = Buffer.from(prompt).toString('base64');
         
-        // --- EN KRİTİK DÜZELTME ---
-        // Twilio'ya, handle-call fonksiyonuna giderken CallSid'yi URL'e
-        // eklemesini açıkça söylüyoruz. {{CallSid}} Twilio'nun kendi değişkenidir.
-        const urlWithParams = `${baseUrl}/.netlify/functions/handle-call?prompt=${encodedPrompt}&first=true&CallSid={{CallSid}}`;
+        // --- NİHAİ DÜZELTME ---
+        // Artık URL'e manuel hiçbir şey eklemiyoruz. Twilio,
+        // CallSid'yi kendisi otomatik olarak ekleyecektir.
+        const initialUrl = `${baseUrl}/.netlify/functions/handle-call?prompt=${encodedPrompt}&first=true`;
 
         const call = await client.calls.create({
-            url: urlWithParams, // Güncellenmiş URL'i kullan
+            url: initialUrl, // Sadece bu basit URL'i kullan
             to: to,
             from: twilioPhoneNumber,
             statusCallback: `${baseUrl}/.netlify/functions/log-call`,
