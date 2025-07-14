@@ -16,11 +16,14 @@ exports.handler = async function(event, context) {
     };
     const transcriptStore = getStore({ name: 'transcripts', ...storeConfig });
     const logStore = getStore({ name: 'call-logs', ...storeConfig });
-    // DİKKAT: Arama bitince ses dosyasını silmek için.
-    const audioStore = getStore({ name: 'public-audio-arsafon', ...storeConfig });
-
+    const audioStore = getStore({ name: 'audio-files-arsafon', ...storeConfig });
 
     try {
+        const { blobs } = await audioStore.list({ prefix: callSid });
+        for (const blob of blobs) {
+            await audioStore.delete(blob.key);
+        }
+
         const transcript = await transcriptStore.get(callSid);
         let summary = "Konuşma metni alınamadı veya konuşma gerçekleşmedi.";
         let sentiment = "N/A";
@@ -36,37 +39,16 @@ exports.handler = async function(event, context) {
             const result = JSON.parse(chatCompletion.choices[0].message.content);
             summary = result.summary;
             sentiment = result.sentiment;
-
             await transcriptStore.delete(callSid);
         }
-
-        // Arama bitince gereksiz ses dosyalarını sil
-        const audioKey = `${callSid}-response.mp3`;
-        await audioStore.delete(audioKey);
-
-        const finalLog = {
-            date: new Date().toISOString(),
-            calledNumber: to,
-            status: callStatus,
-            durationSeconds: callDuration,
-            sentiment: sentiment,
-            summary: summary,
-            callSid: callSid,
-        };
-
+        
+        const finalLog = { date: new Date().toISOString(), calledNumber: to, status: callStatus, durationSeconds: callDuration, sentiment: sentiment, summary: summary, callSid: callSid };
         await logStore.setJSON(callSid, finalLog);
+
     } catch (error) {
         console.error(`Loglama hatası (CallSid: ${callSid}):`, error);
-        await logStore.setJSON(callSid, { 
-            error: 'Özetleme sırasında hata oluştu.',
-            callSid: callSid,
-            status: callStatus,
-            duration: callDuration,
-        });
+        await logStore.setJSON(callSid, { error: 'Özetleme sırasında hata oluştu.', callSid: callSid, status: callStatus, duration: callDuration });
     }
 
-    return {
-        statusCode: 200,
-        body: 'OK',
-    };
+    return { statusCode: 200, body: 'OK' };
 };
