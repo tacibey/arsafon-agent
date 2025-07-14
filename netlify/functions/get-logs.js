@@ -1,8 +1,16 @@
+// netlify/functions/get-logs.js
+
 const { getStore } = require('@netlify/blobs');
 
 exports.handler = async function(event, context) {
     try {
-        const logStore = getStore('call-logs');
+        // --- KRİTİK DÜZELTME: BLOBS BAĞLANTI BİLGİLERİ ---
+        const logStore = getStore({
+            name: "call-logs",
+            siteID: process.env.SITE_ID,
+            token: process.env.NETLIFY_API_TOKEN
+        });
+
         const { blobs } = await logStore.list();
         const logs = blobs.map(blob => logStore.get(blob.key, { type: 'json' }));
         const results = await Promise.all(logs);
