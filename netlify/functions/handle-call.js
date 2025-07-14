@@ -10,8 +10,7 @@ const elevenlabs = new ElevenLabs({ apiKey: process.env.ELEVENLABS_API_KEY });
 const voiceId = 'pNInz6obpgU5sV7FJG3t'; 
 
 exports.handler = async function(event, context) {
-    const { Twilio: twiml } = twilio;
-    const response = new twiml.VoiceResponse();
+const response = new twilio.twiml.VoiceResponse();
     
     // Gelen parametreleri al
     const queryParams = event.queryStringParameters;
