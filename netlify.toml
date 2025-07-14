@@ -2,9 +2,6 @@
   functions = "netlify/functions"
   publish = "public"
 
-# Tüm fonksiyonlar için geçerli olacak genel ayarlar
 [functions]
   node_bundler = "esbuild"
-  # Tüm fonksiyonların zaman aşımı süresini 26 saniye yap
-  # (Netlify'ın izin verdiği maksimum süre budur)
   timeout = 26
