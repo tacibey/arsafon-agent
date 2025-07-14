@@ -5,12 +5,14 @@ const { getStore } = require('@netlify/blobs');
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const elevenlabs = new ElevenLabs({ apiKey: process.env.ELEVENLABS_API_KEY });
-const voiceId = 'xyqF3vGMQlPk3e7yA4DI';
+const voiceId = 'xyqF3vGMQlPk3e7yA4DI'; // Sizin geçerli ses ID'niz
 
-// Stream'i Buffer'a çevirmek için yardımcı fonksiyon
 function streamToBuffer(stream) {
     return new Promise((resolve, reject) => {
         const chunks = [];
+        if (!stream || typeof stream.on !== 'function') {
+            return reject(new TypeError('Verilen stream nesnesi geçersiz.'));
+        }
         stream.on('data', (chunk) => chunks.push(chunk));
         stream.on('end', () => resolve(Buffer.concat(chunks)));
         stream.on('error', reject);
@@ -21,17 +23,23 @@ exports.handler = async function(event, context) {
     const response = new twilio.twiml.VoiceResponse();
     const queryParams = event.queryStringParameters;
     const callSid = queryParams.CallSid;
+    const baseUrl = process.env.BASE_URL;
+
+    if (!baseUrl || !callSid) {
+        console.error("Kritik Hata: BASE_URL veya CallSid eksik!");
+        response.say({ language: 'tr-TR' }, "Kritik bir yapılandırma hatası oluştu. Lütfen yönetici ile iletişime geçin.");
+        response.hangup();
+        return { statusCode: 200, headers: { 'Content-Type': 'text/xml' }, body: response.toString() };
+    }
 
     try {
-        // --- BLOBS DÜZELTMESİ ---
-        // Depolama alanlarını, manuel siteID ve token ile tanımla
         const storeConfig = {
             siteID: process.env.NETLIFY_SITE_ID,
             token: process.env.NETLIFY_AUTH_TOKEN
         };
-        const audioStore = getStore({ name: 'audio-files', ...storeConfig });
+        // DİKKAT: Store adı 'public-' ile başlamalı ki herkese açık olsun.
+        const audioStore = getStore({ name: 'public-audio-arsafon', ...storeConfig });
         const transcriptStore = getStore({ name: 'transcripts', ...storeConfig });
-        // --- DÜZELTME SONU ---
 
         const firstInteraction = queryParams.first !== 'false';
         const encodedPrompt = queryParams.prompt;
@@ -44,7 +52,7 @@ exports.handler = async function(event, context) {
         if (firstInteraction) {
             assistantResponseText = "Merhaba, ben yapay zeka asistanı Volkan, Arsafon'dan arıyorum, müsait miydiniz?";
         } else {
-            if (userInput) {
+             if (userInput) {
                 conversationHistory += `Human: ${userInput}\n`;
             }
             const messages = [
@@ -65,23 +73,21 @@ exports.handler = async function(event, context) {
         }
 
         conversationHistory += `AI: ${assistantResponseText}\n`;
-        if (callSid) {
-            await transcriptStore.set(callSid, conversationHistory);
-        }
+        await transcriptStore.set(callSid, conversationHistory);
 
         const audioStream = await elevenlabs.textToSpeechStream({
             textInput: assistantResponseText,
             voiceId: voiceId,
             modelId: 'eleven_multilingual_v2',
-            output_format: 'mp3_44100_128'
         });
         const audioBuffer = await streamToBuffer(audioStream);
         const audioKey = `${callSid}-response.mp3`;
-        await audioStore.set(audioKey, audioBuffer, {
-            metadata: { contentType: 'audio/mpeg' }
-        });
-        const audioUrl = await audioStore.getSignedURL(audioKey);
-        response.play({}, audioUrl);
+        await audioStore.set(audioKey, audioBuffer);
+        
+        // --- BU KESİNLİKLE DOĞRU YÖNTEM ---
+        const publicAudioUrl = `${baseUrl}/.netlify/blobs/public-audio-arsafon/${audioKey}`;
+        response.play({}, publicAudioUrl);
+        // --- ---
 
         const nextActionUrl = `/.netlify/functions/handle-call?prompt=${encodedPrompt}&first=false&convo=${encodeURIComponent(conversationHistory)}&CallSid=${callSid}`;
 
