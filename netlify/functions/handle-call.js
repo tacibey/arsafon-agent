@@ -24,7 +24,11 @@ const response = new twilio.twiml.VoiceResponse();
     const userInput = event.body ? new URLSearchParams(event.body).get('SpeechResult') : null;
 
     try {
-        const transcriptStore = getStore('transcripts'); // YENİ: Geçici kayıtlar için depolama alanını tanımla
+        const transcriptStore = getStore({
+    name: 'transcripts',
+    siteID: process.env.NETLIFY_SITE_ID,
+    token: process.env.NETLIFY_AUTH_TOKEN
+});
         let assistantResponseText;
 
         if (firstInteraction) {
