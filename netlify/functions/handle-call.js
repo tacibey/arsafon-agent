@@ -5,7 +5,7 @@ const { getStore } = require('@netlify/blobs');
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const elevenlabs = new ElevenLabs({ apiKey: process.env.ELEVENLABS_API_KEY });
-const voiceId = 'xyqF3vGMQlPk3e7yA4DI'; // Sizin geçerli ses ID'niz
+const voiceId = 'xyqF3vGMQlPk3e7yA4DI'; 
 
 function streamToBuffer(stream) {
     return new Promise((resolve, reject) => {
@@ -20,18 +20,14 @@ function streamToBuffer(stream) {
 }
 
 exports.handler = async function(event, context) {
-    // Hata ayıklama için gelen tüm isteği logla
-    console.log("GELEN EVENT:", JSON.stringify(event, null, 2));
-
     const response = new twilio.twiml.VoiceResponse();
     
-    // --- BU KESİNLİKLE DOĞRU ÇÖZÜM ---
-    const queryParams = event.queryStringParameters;
-    const bodyParams = event.body ? new URLSearchParams(event.body) : new URLSearchParams();
-    // CallSid'yi hem URL'de hem de gövdede ara. Hangisinde varsa onu al.
-    const callSid = queryParams.CallSid || bodyParams.get('CallSid');
-    // --- ÇÖZÜMÜN SONU ---
+    // --- BU, TÜM SORUNU ÇÖZEN DEĞİŞİKLİK ---
+    const bodyParams = new URLSearchParams(event.body);
+    const callSid = bodyParams.get('CallSid'); // CallSid HER ZAMAN event.body içinden gelir.
+    // --- DEĞİŞİKLİK SONU ---
     
+    const queryParams = event.queryStringParameters;
     const baseUrl = process.env.BASE_URL;
 
     if (!baseUrl || !callSid) {
@@ -95,8 +91,7 @@ exports.handler = async function(event, context) {
         const publicAudioUrl = `${baseUrl}/.netlify/blobs/public-audio-arsafon/${audioKey}`;
         response.play({}, publicAudioUrl);
         
-        // `first` parametresini false olarak güncelleyerek bir sonraki adıma geç
-        const nextActionUrl = `/.netlify/functions/handle-call?prompt=${encodedPrompt}&first=false&convo=${encodeURIComponent(conversationHistory)}&CallSid=${callSid}`;
+        const nextActionUrl = `/.netlify/functions/handle-call?prompt=${encodedPrompt}&first=false&convo=${encodeURIComponent(conversationHistory)}`;
 
         response.gather({
             input: 'speech',
