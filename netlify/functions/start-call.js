@@ -8,32 +8,29 @@ exports.handler = async function(event, context) {
     }
 
     const { to, prompt } = JSON.parse(event.body);
-    const accountSid = process.env.TWILIO_ACCOUNT_SID;
-    const authToken = process.env.TWILIO_AUTH_TOKEN;
-    const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
-    const baseUrl = process.env.BASE_URL;
+    const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER, BASE_URL } = process.env;
 
-    if (!to || !prompt || !accountSid || !authToken || !twilioPhoneNumber || !baseUrl) {
+    if (!to || !prompt || !TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER || !BASE_URL) {
         return { 
             statusCode: 500, 
             body: JSON.stringify({ error: "Ortam değişkenleri eksik." }) 
         };
     }
 
-    const client = twilio(accountSid, authToken);
+    const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
 
     try {
         const encodedPrompt = Buffer.from(prompt).toString('base64');
         
-        // DEĞİŞİKLİK: Arama ilk başladığında, konuşmayı başlatması için doğrudan process-and-respond'e gider.
-        const initialUrl = `${baseUrl}/.netlify/functions/process-and-respond?prompt=${encodedPrompt}&initial=true`;
+        // Arama başladığında, her şeyi yapacak olan TEK fonksiyona git.
+        const initialUrl = `${BASE_URL}/.netlify/functions/handle-call?prompt=${encodedPrompt}`;
 
         const call = await client.calls.create({
             url: initialUrl,
-            method: 'POST', // Her zaman POST kullandığımızdan emin olalım.
+            method: 'POST',
             to: to,
-            from: twilioPhoneNumber,
-            statusCallback: `${baseUrl}/.netlify/functions/log-call`,
+            from: TWILIO_PHONE_NUMBER,
+            statusCallback: `${BASE_URL}/.netlify/functions/log-call`,
             statusCallbackMethod: 'POST',
             statusCallbackEvent: ['completed'],
         });
