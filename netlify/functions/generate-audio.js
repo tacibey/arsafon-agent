@@ -2,7 +2,7 @@
 
 const ElevenLabsNode = require('elevenlabs-node');
 const elevenlabs = new ElevenLabsNode({ apiKey: process.env.ELEVENLABS_API_KEY });
-const voiceId = 'xyqF3vGMQlPk3e7yA4DI'; // Cansu sesinin ID'si
+const voiceId = 'xyqF3vGMQlPk3e7yA4DI'; // Sizin Volkan sesinizin ID'si
 
 function streamToBuffer(stream) {
     return new Promise((resolve, reject) => {
@@ -20,16 +20,11 @@ exports.handler = async function(event, context) {
             return { statusCode: 400, body: 'Söylenecek metin eksik.' };
         }
 
-        // --- SES KALİTESİ İYİLEŞTİRMESİ ---
         const audioStream = await elevenlabs.textToSpeechStream({
             textInput: textToSpeak,
             voiceId: voiceId,
-            modelId: 'eleven_multilingual_v2',
-            // Bu ayarlar sesi daha doğal yapar:
-            stability: 0.5,       // Daha fazla ifade ve duygu için değeri düşürdük (0-1 arası).
-            similarity_boost: 0.75  // Sesin orijinal karaktere ne kadar sadık kalacağı (0-1 arası).
+            modelId: 'eleven_multilingual_v2'
         });
-        // --- İYİLEŞTİRME BİTTİ ---
 
         const audioBuffer = await streamToBuffer(audioStream);
 
