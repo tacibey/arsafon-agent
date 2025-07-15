@@ -4,12 +4,10 @@ const { getStore } = require('@netlify/blobs');
 
 exports.handler = async function(event, context) {
     try {
-        // --- KRİTİK DÜZELTME: BLOBS BAĞLANTI BİLGİLERİ ---
-        const logStore = getStore({
-            name: "call-logs",
-            siteID: process.env.SITE_ID,
-            token: process.env.NETLIFY_API_TOKEN
-        });
+        // --- DOĞRU BAĞLANTI YÖNTEMİ ---
+        const { SITE_ID, NETLIFY_API_TOKEN } = process.env;
+        const storeOptions = { siteID: SITE_ID, token: NETLIFY_API_TOKEN, apiURL: "https://api.netlify.com" };
+        const logStore = getStore('call-logs', storeOptions);
 
         const { blobs } = await logStore.list();
         const logs = blobs.map(blob => logStore.get(blob.key, { type: 'json' }));
