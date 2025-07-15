@@ -4,18 +4,15 @@ const { getStore } = require('@netlify/blobs');
 
 exports.handler = async function(event, context) {
     const key = event.queryStringParameters.key;
-
     if (!key) {
         return { statusCode: 400, body: 'Dosya anahtarı (key) eksik.' };
     }
 
     try {
-        // --- KRİTİK DÜZELTME: BLOBS BAĞLANTI BİLGİLERİ ---
-        const audioStore = getStore({
-            name: "audio-files-arsafon",
-            siteID: process.env.SITE_ID,
-            token: process.env.NETLIFY_API_TOKEN
-        });
+        // --- DOĞRU BAĞLANTI YÖNTEMİ ---
+        const { SITE_ID, NETLIFY_API_TOKEN } = process.env;
+        const storeOptions = { siteID: SITE_ID, token: NETLIFY_API_TOKEN, apiURL: "https://api.netlify.com" };
+        const audioStore = getStore('audio-files-arsafon', storeOptions);
 
         const audioBuffer = await audioStore.get(key, { type: 'buffer' });
 
