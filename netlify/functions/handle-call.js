@@ -2,12 +2,12 @@
 
 const twilio = require('twilio');
 const Groq = require('groq-sdk');
-const ElevenLabs = 'elevenlabs-node'; // Düzeltme: elevenlabs-node bir string olmamalı
+const ElevenLabsNode = require('elevenlabs-node'); // 1. ÖNEMLİ DÜZELTME
 const { getStore } = require('@netlify/blobs');
-const ElevenLabsNode = require('elevenlabs-node'); // Doğru import
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-const elevenlabs = new ElevenLabsNode({ apiKey: process.env.ELEVENLABS_API_KEY }); // Doğru kullanım
+// 2. ÖNEMLİ DÜZELTME: Kütüphaneyi doğru değişkenle başlat
+const elevenlabs = new ElevenLabsNode({ apiKey: process.env.ELEVENLABS_API_KEY });
 const voiceId = 'xyqF3vGMQlPk3e7yA4DI';
 
 function streamToBuffer(stream) {
@@ -38,8 +38,7 @@ exports.handler = async function(event, context) {
         const { BASE_URL } = process.env;
         const systemPrompt = Buffer.from(encodedPrompt, 'base64').toString('utf8');
 
-        // --- EN BASİT VE DOĞRU KULLANIM ---
-        // Ortam değişkenleri zaten var olduğu için, kütüphane bunları otomatik bulacaktır.
+        // 3. ÖNEMLİ DÜZELTME: En basit ve doğru kullanım.
         const transcriptStore = getStore('transcripts');
         const audioStore = getStore('audio-files-arsafon');
 
@@ -72,12 +71,12 @@ exports.handler = async function(event, context) {
             input: 'speech', speechTimeout: 'auto', timeout: 4, language: 'tr-TR',
             action: `/.netlify/functions/handle-call?prompt=${encodedPrompt}`, method: 'POST'
         });
-        gather.say({ language: 'tr-TR' }, "Hatta birini duyamadım. Görüşmeyi sonlandırıyorum.");
+        gather.say({ language: 'tr-TR' }, "Hatta birini duyamadım.");
         twiml.hangup();
 
     } catch (error) {
         console.error(`handle-call Hatası (CallSid: ${callSid}):`, error);
-        twiml.say({ language: 'tr-TR' }, "Beklenmedik bir sistem hatası oluştu. Lütfen logları kontrol ediniz.");
+        twiml.say({ language: 'tr-TR' }, "Sistemde bir hata oluştu. Lütfen logları kontrol edin.");
         twiml.hangup();
     }
     
