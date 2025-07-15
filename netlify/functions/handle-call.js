@@ -3,7 +3,8 @@
 const twilio = require('twilio');
 const Groq = require('groq-sdk');
 const ElevenLabs = require('elevenlabs-node');
-const { getStore } = require('@netlify/blobs');
+// DEĞİŞİKLİK: getStore yerine Client'ı alıyoruz.
+const { Client } = require('@netlify/blobs');
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const elevenlabs = new ElevenLabs({ apiKey: process.env.ELEVENLABS_API_KEY });
@@ -23,11 +24,9 @@ exports.handler = async function(event, context) {
     const headers = { 'Content-Type': 'text/xml' };
     
     const bodyParams = new URLSearchParams(event.body);
-    const queryParams = event.queryStringParameters;
-
     const callSid = bodyParams.get('CallSid');
     const userInput = bodyParams.get('SpeechResult');
-    const encodedPrompt = queryParams.prompt;
+    const encodedPrompt = event.queryStringParameters.prompt;
 
     if (!callSid || !encodedPrompt) {
         twiml.say({ language: 'tr-TR' }, 'Kritik yapılandırma hatası.');
@@ -36,13 +35,13 @@ exports.handler = async function(event, context) {
     }
 
     try {
-        const { BASE_URL } = process.env;
+        const { BASE_URL, SITE_ID, NETLIFY_API_TOKEN } = process.env;
         const systemPrompt = Buffer.from(encodedPrompt, 'base64').toString('utf8');
 
-        // --- DOĞRU BAĞLANTI YÖNTEMİ ---
-        // Kütüphanenin beklediği doğru kullanım bu.
-        const transcriptStore = getStore('transcripts');
-        const audioStore = getStore('audio-files-arsafon');
+        // --- NİHAİ ÇÖZÜM: İSTEMCİYİ MANUEL OLUŞTUR ---
+        const client = new Client({ siteID: SITE_ID, token: NETLIFY_API_TOKEN });
+        const transcriptStore = client.getStore('transcripts');
+        const audioStore = client.getStore('audio-files-arsafon');
 
         let conversationHistory = await transcriptStore.get(callSid, { type: 'text' }).catch(() => "");
         if (userInput) {
@@ -55,7 +54,7 @@ exports.handler = async function(event, context) {
             messages.push({ role: speaker.toLowerCase() === 'ai' ? 'assistant' : 'user', content: content.join(': ') });
         });
         
-        const chatCompletion = await groq.chat.completions.create({ messages, model: 'llama3-8b-8192', temperature: 0.7 });
+        const chatCompletion = await groq.chat.completions.create({ messages, model: 'llama3-8b-8192' });
         const assistantResponseText = chatCompletion.choices[0]?.message?.content || "Üzgünüm, bir sorun oluştu.";
         
         conversationHistory += `AI: ${assistantResponseText}\n`;
@@ -73,13 +72,12 @@ exports.handler = async function(event, context) {
             input: 'speech', speechTimeout: 'auto', timeout: 4, language: 'tr-TR',
             action: `/.netlify/functions/handle-call?prompt=${encodedPrompt}`, method: 'POST'
         });
-
         gather.say({ language: 'tr-TR' }, "Hatta birini duyamadım. Görüşmeyi sonlandırıyorum.");
         twiml.hangup();
 
     } catch (error) {
         console.error(`handle-call Hatası (CallSid: ${callSid}):`, error);
-        twiml.say({ language: 'tr-TR' }, "Beklenmedik bir sistem hatası oluştu. Üzgünüm, hoşçakalın.");
+        twiml.say({ language: 'tr-TR' }, "Beklenmedik bir sistem hatası oluştu.");
         twiml.hangup();
     }
     
