@@ -12,7 +12,6 @@ exports.handler = async function(event, context) {
     const queryParams = event.queryStringParameters;
     const userInput = new URLSearchParams(event.body).get('SpeechResult');
     
-    // Konuşma geçmişini URL'den al veya başlat
     const conversation = queryParams.convo ? JSON.parse(Buffer.from(queryParams.convo, 'base64').toString()) : [];
     
     if (userInput) {
@@ -26,26 +25,23 @@ exports.handler = async function(event, context) {
         const chatCompletion = await groq.chat.completions.create({ messages, model: 'llama3-8b-8192' });
         const assistantResponseText = chatCompletion.choices[0]?.message?.content || "Üzgünüm, bir sorun oluştu.";
         
-        // AI'ın cevabını konuşma geçmişine ekle
         conversation.push({ role: 'assistant', content: assistantResponseText });
         
-        // Twilio'nun kendi sesini kullanarak konuş. Bu en sağlam yöntemdir.
-        twiml.say({ voice: 'Polly.Filiz', language: 'tr-TR' }, assistantResponseText);
+        // --- DEĞİŞİKLİK BURADA ---
+        // Sesi doğrudan çalmak yerine, ses üretecek olan fonksiyona yönlendiriyoruz.
+        const textToSpeakEncoded = Buffer.from(assistantResponseText).toString('base64');
+        const audioUrl = `/.netlify/functions/generate-audio?text=${textToSpeakEncoded}`;
+        twiml.play({}, audioUrl);
+        // --- DEĞİŞİKLİK BİTTİ ---
 
-        // Yeni konuşma geçmişini URL'de taşımak için kodla
         const nextConvo = Buffer.from(JSON.stringify(conversation)).toString('base64');
         const actionUrl = `/.netlify/functions/handle-call?prompt=${queryParams.prompt}&convo=${nextConvo}`;
 
         const gather = twiml.gather({
-            input: 'speech',
-            speechTimeout: 'auto',
-            timeout: 4,
-            language: 'tr-TR',
-            action: actionUrl,
-            method: 'POST'
+            input: 'speech', speechTimeout: 'auto', timeout: 4, language: 'tr-TR',
+            action: actionUrl, method: 'POST'
         });
 
-        // Kullanıcı cevap vermezse
         twiml.say({ voice: 'Polly.Filiz', language: 'tr-TR' }, "Görüşmek üzere, hoşçakalın.");
         twiml.hangup();
 
@@ -55,5 +51,5 @@ exports.handler = async function(event, context) {
         twiml.hangup();
     }
     
-    return { statusCode: 200, headers: headers, body: twiml.toString() };
+    return { statusCode: 200, headers: body: twiml.toString() };
 };
