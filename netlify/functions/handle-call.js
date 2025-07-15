@@ -2,12 +2,12 @@
 
 const twilio = require('twilio');
 const Groq = require('groq-sdk');
-const ElevenLabs = require('elevenlabs-node');
-// DEĞİŞİKLİK: getStore yerine Client'ı alıyoruz.
-const { Client } = require('@netlify/blobs');
+const ElevenLabs = 'elevenlabs-node'; // Düzeltme: elevenlabs-node bir string olmamalı
+const { getStore } = require('@netlify/blobs');
+const ElevenLabsNode = require('elevenlabs-node'); // Doğru import
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-const elevenlabs = new ElevenLabs({ apiKey: process.env.ELEVENLABS_API_KEY });
+const elevenlabs = new ElevenLabsNode({ apiKey: process.env.ELEVENLABS_API_KEY }); // Doğru kullanım
 const voiceId = 'xyqF3vGMQlPk3e7yA4DI';
 
 function streamToBuffer(stream) {
@@ -35,13 +35,13 @@ exports.handler = async function(event, context) {
     }
 
     try {
-        const { BASE_URL, SITE_ID, NETLIFY_API_TOKEN } = process.env;
+        const { BASE_URL } = process.env;
         const systemPrompt = Buffer.from(encodedPrompt, 'base64').toString('utf8');
 
-        // --- NİHAİ ÇÖZÜM: İSTEMCİYİ MANUEL OLUŞTUR ---
-        const client = new Client({ siteID: SITE_ID, token: NETLIFY_API_TOKEN });
-        const transcriptStore = client.getStore('transcripts');
-        const audioStore = client.getStore('audio-files-arsafon');
+        // --- EN BASİT VE DOĞRU KULLANIM ---
+        // Ortam değişkenleri zaten var olduğu için, kütüphane bunları otomatik bulacaktır.
+        const transcriptStore = getStore('transcripts');
+        const audioStore = getStore('audio-files-arsafon');
 
         let conversationHistory = await transcriptStore.get(callSid, { type: 'text' }).catch(() => "");
         if (userInput) {
@@ -77,7 +77,7 @@ exports.handler = async function(event, context) {
 
     } catch (error) {
         console.error(`handle-call Hatası (CallSid: ${callSid}):`, error);
-        twiml.say({ language: 'tr-TR' }, "Beklenmedik bir sistem hatası oluştu.");
+        twiml.say({ language: 'tr-TR' }, "Beklenmedik bir sistem hatası oluştu. Lütfen logları kontrol ediniz.");
         twiml.hangup();
     }
     
