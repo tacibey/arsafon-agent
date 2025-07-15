@@ -2,8 +2,11 @@
 
 const twilio = require('twilio');
 const Groq = require('groq-sdk');
+const ElevenLabsNode = require('elevenlabs-node');
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const elevenlabs = new ElevenLabsNode({ apiKey: process.env.ELEVENLABS_API_KEY });
+const voiceId = 'xyqF3vGMQlPk3e7yA4DI'; // Cansu sesinin ID'si (veya kullandığınız ses)
 
 exports.handler = async function(event, context) {
     const twiml = new twilio.twiml.VoiceResponse();
@@ -11,9 +14,8 @@ exports.handler = async function(event, context) {
 
     const queryParams = event.queryStringParameters;
     const userInput = new URLSearchParams(event.body).get('SpeechResult');
-    
     const conversation = queryParams.convo ? JSON.parse(Buffer.from(queryParams.convo, 'base64').toString()) : [];
-    
+
     if (userInput) {
         conversation.push({ role: 'user', content: userInput });
     }
@@ -22,13 +24,20 @@ exports.handler = async function(event, context) {
     const messages = [{ role: 'system', content: systemPrompt }, ...conversation];
 
     try {
-        const chatCompletion = await groq.chat.completions.create({ messages, model: 'llama3-8b-8192' });
+        // --- SİZİN VERDİĞİNİZ BİLGİLERLE GÜNCELLEME ---
+        const chatCompletion = await groq.chat.completions.create({
+            messages: messages,
+            model: "meta-llama/llama-4-maverick-17b-128e-instruct", // 1. YENİ VE DOĞRU MODEL
+            temperature: 0.3, // 2. Senaryoya sadık kalması için yaratıcılığı düşürüyoruz
+            max_tokens: 256, // 3. Cevaplar kısa olacağı için 256 yeterli
+            top_p: 1,
+            stream: false // 4. Cevabın tamamını tek seferde alıyoruz
+        });
+        // --- GÜNCELLEME BİTTİ ---
+
         const assistantResponseText = chatCompletion.choices[0]?.message?.content || "Üzgünüm, bir sorun oluştu.";
-        
         conversation.push({ role: 'assistant', content: assistantResponseText });
-        
-        // Sesi doğrudan çalmak yerine, ses üretecek olan fonksiyona yönlendiriyoruz.
-        // Metni Base64'e çevirerek URL'de güvenli bir şekilde taşıyoruz.
+
         const textToSpeakEncoded = Buffer.from(assistantResponseText).toString('base64');
         const audioUrl = `/.netlify/functions/generate-audio?text=${textToSpeakEncoded}`;
         twiml.play({}, audioUrl);
@@ -41,7 +50,6 @@ exports.handler = async function(event, context) {
             action: actionUrl, method: 'POST'
         });
 
-        // Gather zaman aşımına uğrarsa
         twiml.hangup();
 
     } catch (error) {
@@ -49,7 +57,7 @@ exports.handler = async function(event, context) {
         twiml.say({ voice: 'Polly.Filiz', language: 'tr-TR' }, "Sistemde bir hata oluştu.");
         twiml.hangup();
     }
-    
+
     return {
         statusCode: 200,
         headers: headers,
