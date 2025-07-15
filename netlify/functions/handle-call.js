@@ -42,7 +42,8 @@ exports.handler = async function(event, context) {
             action: actionUrl, method: 'POST'
         });
 
-        twiml.say({ voice: 'Polly.Filiz', language: 'tr-TR' }, "Görüşmek üzere, hoşçakalın.");
+        // Bu satırı şimdilik kaldırıyorum, gather zaman aşımına uğradığında otomatik kapanır.
+        // twiml.say({ voice: 'Polly.Filiz', language: 'tr-TR' }, "Görüşmek üzere, hoşçakalın.");
         twiml.hangup();
 
     } catch (error) {
@@ -51,5 +52,10 @@ exports.handler = async function(event, context) {
         twiml.hangup();
     }
     
-    return { statusCode: 200, headers: body: twiml.toString() };
+    // --- YAZIM HATASI DÜZELTİLDİ ---
+    return {
+        statusCode: 200,
+        headers: headers,
+        body: twiml.toString() // Önceki kodda burada bir yazım hatası vardı.
+    };
 };
