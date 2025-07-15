@@ -2,11 +2,11 @@
 
 const twilio = require('twilio');
 const Groq = require('groq-sdk');
-const ElevenLabsNode = require('elevenlabs-node');
 
-// ... (kütüphane başlangıçları aynı)
+// --- HATA 1: BU SATIRLARI EKLEMEYİ UNUTMUŞUM ---
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+// --- HATA 1 DÜZELTİLDİ ---
 
-// --- YENİ KARAR AĞACI: AI sadece bu listeden bir isim seçecek ---
 const responseMap = {
     GREETING: "Merhaba, ismim Cansu, satılık arsanız için aramıştım. Müsait miydiniz?",
     ASK_DETAILS: "Arsanız acil mi satılık ve pazarlık payınız var mıdır?",
@@ -16,22 +16,32 @@ const responseMap = {
 };
 
 exports.handler = async function(event, context) {
-    // ... (kodun başı aynı)
+    // --- HATA 2: BU SATIRLARI EKLEMEYİ UNUTMUŞUM ---
+    const twiml = new twilio.twiml.VoiceResponse();
+    const headers = { 'Content-Type': 'text/xml' };
+
+    const queryParams = event.queryStringParameters;
+    const userInput = new URLSearchParams(event.body).get('SpeechResult');
+    const conversation = queryParams.convo ? JSON.parse(Buffer.from(queryParams.convo, 'base64').toString()) : [];
+    // --- HATA 2 DÜZELTİLDİ ---
+
+    if (userInput) {
+        conversation.push({ role: 'user', content: userInput });
+    }
+
+    const systemPrompt = Buffer.from(queryParams.prompt, 'base64').toString('utf8');
+    const messages = [{ role: 'system', content: systemPrompt }, ...conversation];
+
     try {
-        // --- YENİ MODEL VE KİLİTLENMİŞ AYARLAR ---
         const chatCompletion = await groq.chat.completions.create({
             messages,
-            model: 'mistral-saba-24b', // Sizin önerdiğiniz model
-            temperature: 0,          // Yaratıcılık SIFIR.
-            top_p: 0.1,              // Sadece en olası kelimeyi seç.
-            max_tokens: 10           // Sadece tek bir kelime (seçenek adı) döneceği için 10 token yeterli.
+            model: 'mistral-saba-24b', // Veya 'llama3-70b-8192' daha iyi sonuç verirse
+            temperature: 0,
+            top_p: 0.1,
+            max_tokens: 15
         });
-        // --- GÜNCELLEME BİTTİ ---
-
-        // AI'dan gelen cevap "GREETING", "CLOSING" gibi bir anahtar kelime olacak.
-        const responseKey = chatCompletion.choices[0]?.message?.content.trim() || 'FALLBACK';
         
-        // Bu anahtar kelimeye karşılık gelen tam metni haritadan alıyoruz.
+        const responseKey = chatCompletion.choices[0]?.message?.content.trim() || 'FALLBACK';
         const assistantResponseText = responseMap[responseKey] || responseMap['FALLBACK'];
         
         conversation.push({ role: 'assistant', content: assistantResponseText });
@@ -43,7 +53,6 @@ exports.handler = async function(event, context) {
         const nextConvo = Buffer.from(JSON.stringify(conversation)).toString('base64');
         const actionUrl = `/.netlify/functions/handle-call?prompt=${queryParams.prompt}&convo=${nextConvo}`;
 
-        // Eğer AI kapanış cümlesini seçtiyse, tekrar dinleme (gather) yapma.
         if (responseKey === 'CLOSING') {
             twiml.hangup();
         } else {
@@ -51,7 +60,7 @@ exports.handler = async function(event, context) {
                 input: 'speech', speechTimeout: 'auto', timeout: 4, language: 'tr-TR',
                 action: actionUrl, method: 'POST'
             });
-            twiml.hangup(); // Gather başarısız olursa kapat.
+            twiml.hangup();
         }
 
     } catch (error) {
@@ -62,7 +71,7 @@ exports.handler = async function(event, context) {
     
     return {
         statusCode: 200,
-        headers: { 'Content-Type': 'text/xml' },
+        headers: headers,
         body: twiml.toString()
     };
 };
