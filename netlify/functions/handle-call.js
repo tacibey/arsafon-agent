@@ -1,50 +1,87 @@
 // netlify/functions/handle-call.js
 
 const twilio = require('twilio');
+const Groq = require('groq-sdk');
+const ElevenLabs = require('elevenlabs-node');
+const { getStore } = require('@netlify/blobs');
+
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const elevenlabs = new ElevenLabs({ apiKey: process.env.ELEVENLABS_API_KEY });
+const voiceId = 'xyqF3vGMQlPk3e7yA4DI';
+
+function streamToBuffer(stream) {
+    return new Promise((resolve, reject) => {
+        const chunks = [];
+        stream.on('data', (chunk) => chunks.push(chunk));
+        stream.on('end', () => resolve(Buffer.concat(chunks)));
+        stream.on('error', reject);
+    });
+}
 
 exports.handler = async function(event, context) {
     const twiml = new twilio.twiml.VoiceResponse();
     const headers = { 'Content-Type': 'text/xml' };
     
-    // --- TEŞHİS ADIMI ---
-    // Fonksiyonun hangi ortam değişkenlerini gördüğünü loglayalım.
-    // Bu, sorunun kaynağını bize KESİN olarak gösterecek.
-    console.log("--- ORTAM DEĞİŞKENLERİ KONTROLÜ ---");
-    console.log("process.env.SITE_ID:", process.env.SITE_ID);
-    console.log("process.env.NETLIFY_API_TOKEN:", process.env.NETLIFY_API_TOKEN);
-    console.log("process.env.GROQ_API_KEY:", process.env.GROQ_API_KEY ? 'Mevcut' : 'Mevcut DEĞİL');
-    console.log("------------------------------------");
-
     const bodyParams = new URLSearchParams(event.body);
+    const queryParams = event.queryStringParameters;
+
     const callSid = bodyParams.get('CallSid');
+    const userInput = bodyParams.get('SpeechResult');
+    const encodedPrompt = queryParams.prompt;
 
-    // Bu teşhis adımında, hata vermesi normaldir.
-    // Tek amacımız yukarıdaki logları görmektir.
+    if (!callSid || !encodedPrompt) {
+        twiml.say({ language: 'tr-TR' }, 'Kritik yapılandırma hatası.');
+        twiml.hangup();
+        return { statusCode: 200, headers, body: twiml.toString() };
+    }
+
     try {
-        const { SITE_ID, NETLIFY_API_TOKEN } = process.env;
+        const { BASE_URL } = process.env;
+        const systemPrompt = Buffer.from(encodedPrompt, 'base64').toString('utf8');
 
-        // Kodun hata vermesini ve logları oluşturmasını bekliyoruz.
-        if (!SITE_ID || !NETLIFY_API_TOKEN) {
-            // Bu hata mesajını bilerek oluşturuyoruz ki logları görebilelim.
-            throw new Error("SITE_ID veya NETLIFY_API_TOKEN ortam değişkenleri bulunamadı!");
+        // --- DOĞRU BAĞLANTI YÖNTEMİ ---
+        // Kütüphanenin beklediği doğru kullanım bu.
+        const transcriptStore = getStore('transcripts');
+        const audioStore = getStore('audio-files-arsafon');
+
+        let conversationHistory = await transcriptStore.get(callSid, { type: 'text' }).catch(() => "");
+        if (userInput) {
+            conversationHistory += `Human: ${userInput}\n`;
         }
+
+        const messages = [{ role: 'system', content: systemPrompt }];
+        conversationHistory.split('\n').filter(Boolean).forEach(line => {
+            const [speaker, ...content] = line.split(': ');
+            messages.push({ role: speaker.toLowerCase() === 'ai' ? 'assistant' : 'user', content: content.join(': ') });
+        });
         
-        // Bu kısım muhtemelen çalışmayacak, önemli değil.
-        twiml.say({ language: 'tr-TR' }, 'Sistem teşhis modunda.');
+        const chatCompletion = await groq.chat.completions.create({ messages, model: 'llama3-8b-8192', temperature: 0.7 });
+        const assistantResponseText = chatCompletion.choices[0]?.message?.content || "Üzgünüm, bir sorun oluştu.";
+        
+        conversationHistory += `AI: ${assistantResponseText}\n`;
+        await transcriptStore.set(callSid, conversationHistory);
+        
+        const audioStream = await elevenlabs.textToSpeechStream({ textInput: assistantResponseText, voiceId, modelId: 'eleven_multilingual_v2' });
+        const audioBuffer = await streamToBuffer(audioStream);
+        const audioKey = `${callSid}-${Date.now()}.mp3`;
+        await audioStore.set(audioKey, audioBuffer);
+        
+        const audioUrl = `${BASE_URL}/.netlify/functions/serve-audio?key=${audioKey}`;
+        twiml.play({}, audioUrl);
+
+        const gather = twiml.gather({
+            input: 'speech', speechTimeout: 'auto', timeout: 4, language: 'tr-TR',
+            action: `/.netlify/functions/handle-call?prompt=${encodedPrompt}`, method: 'POST'
+        });
+
+        gather.say({ language: 'tr-TR' }, "Hatta birini duyamadım. Görüşmeyi sonlandırıyorum.");
         twiml.hangup();
 
     } catch (error) {
-        // Hata mesajını konsola yazdır.
         console.error(`handle-call Hatası (CallSid: ${callSid}):`, error);
-        
-        // Twilio'ya hata olduğunu söyle.
-        twiml.say({ language: 'tr-TR' }, "Sistemde bir yapılandırma hatası tespit edildi. Lütfen logları kontrol edin.");
+        twiml.say({ language: 'tr-TR' }, "Beklenmedik bir sistem hatası oluştu. Üzgünüm, hoşçakalın.");
         twiml.hangup();
     }
     
-    return {
-        statusCode: 200,
-        headers: headers,
-        body: twiml.toString()
-    };
+    return { statusCode: 200, headers, body: twiml.toString() };
 };
