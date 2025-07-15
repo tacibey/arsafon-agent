@@ -20,14 +20,15 @@ exports.handler = async function(event, context) {
             return { statusCode: 400, body: 'Söylenecek metin eksik.' };
         }
 
-        // --- SES KALİTESİ İYİLEŞTİRMESİ ---
+        // --- GELİŞMİŞ SES AYARLARI ---
         const audioStream = await elevenlabs.textToSpeechStream({
             textInput: textToSpeak,
             voiceId: voiceId,
             modelId: 'eleven_multilingual_v2',
-            // Bu ayarlar sesi daha doğal yapar:
-            stability: 0.5,       // Daha fazla ifade ve duygu için değeri düşürdük (0-1 arası).
-            similarity_boost: 0.75  // Sesin orijinal karaktere ne kadar sadık kalacağı (0-1 arası).
+            stability: 0.3,         // Önerdiğiniz gibi, daha fazla ifade için düşürüldü.
+            similarity_boost: 0.7,  // Sesin karakterini korumak için hafifçe düşürüldü.
+            style: 0.1,             // Çok abartılı olmadan hafif bir konuşma tarzı ekler (0-1 arası).
+            speaker_boost: true     // Sesin netliğini ve kalitesini artırır.
         });
         // --- İYİLEŞTİRME BİTTİ ---
 
