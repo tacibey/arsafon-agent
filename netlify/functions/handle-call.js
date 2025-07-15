@@ -27,7 +27,7 @@ exports.handler = async function(event, context) {
         // --- SİZİN VERDİĞİNİZ BİLGİLERLE GÜNCELLEME ---
         const chatCompletion = await groq.chat.completions.create({
             messages: messages,
-            model: "llama3-70b-8192", // 1. YENİ VE DOĞRU MODEL
+            model: "gemma2-9b-it", // 1. YENİ VE DOĞRU MODEL
             temperature: 0.3, // 2. Senaryoya sadık kalması için yaratıcılığı düşürüyoruz
             max_tokens: 256, // 3. Cevaplar kısa olacağı için 256 yeterli
             top_p: 1,
